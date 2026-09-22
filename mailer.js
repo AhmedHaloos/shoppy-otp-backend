@@ -11,6 +11,7 @@ const transporter = nodemailer.createTransport({
 const SUBJECTS = {
   emailChange: 'Confirm your new shoppy email',
   passwordReset: 'Your shoppy password reset code',
+  registerVerify: 'Verify your shoppy account',
 };
 
 async function sendOtpEmail(to, code, purpose) {

@@ -158,6 +158,44 @@ app.post('/otp/password-reset/verify', async (req, res) => {
   }
 });
 
+// --- Register email verification ----------------------------------------
+
+app.post('/otp/register-verify/request', async (req, res) => {
+  try {
+    const uid = await uidFromIdToken(req);
+    const user = await admin.auth().getUser(uid);
+    if (user.emailVerified) {
+      return res.json({ ok: true, alreadyVerified: true });
+    }
+    const code = await createOtp(uid, 'registerVerify', {});
+    await sendOtpEmail(user.email, code, 'registerVerify');
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message || 'Request failed.' });
+  }
+});
+
+app.post('/otp/register-verify/verify', async (req, res) => {
+  try {
+    const uid = await uidFromIdToken(req);
+    const code = (req.body.code || '').trim();
+    if (!code) {
+      return res.status(400).json({ error: 'code is required.' });
+    }
+
+    try {
+      await verifyOtp(uid, code);
+    } catch (e) {
+      return res.status(400).json({ error: otpErrorMessage(e.code) });
+    }
+
+    await admin.auth().updateUser(uid, { emailVerified: true });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message || 'Verification failed.' });
+  }
+});
+
 app.get('/', (req, res) => res.json({ ok: true, service: 'shoppy-otp-backend' }));
 
 // `node index.js` (local dev / any traditional host) starts a normal
