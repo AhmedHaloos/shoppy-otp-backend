@@ -1,8 +1,19 @@
 const admin = require('firebase-admin');
 
-// FIREBASE_SERVICE_ACCOUNT holds the entire service-account JSON as one
-// env-var string (see .env.example) -- avoids committing a key file.
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+// Prefer FIREBASE_SERVICE_ACCOUNT_BASE64 (the whole service-account JSON,
+// base64-encoded) over the raw-JSON FIREBASE_SERVICE_ACCOUNT -- several
+// hosting UIs (confirmed live on Vercel) mangle the private_key field's
+// escaped \n newlines when a raw multi-field JSON blob is pasted into
+// their environment-variable editor, especially via a bulk/.env-style
+// paste, corrupting the PEM and breaking Admin SDK init. Base64 has no
+// characters any of these UIs could misinterpret, so it's immune to this
+// whole class of bug. Raw JSON is kept as a fallback for local `.env`
+// use, where this problem doesn't occur.
+const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64
+  ? JSON.parse(
+      Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8')
+    )
+  : JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),

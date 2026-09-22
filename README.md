@@ -61,28 +61,51 @@ curl -X POST http://localhost:3000/otp/email-change/request \
 
 Confirm the email actually arrives before moving on to deployment.
 
-## 2. Deploy to Render (free tier, no card required)
+## 2. Deploy to Vercel (free Hobby tier, no card required)
+
+Render's free tier now requires card verification (even though it's not
+charged), which defeats the original card-free requirement, so this
+deploys to Vercel instead. The app is set up to run as a Vercel
+serverless function (see `vercel.json` + the `require.main === module`
+guard at the bottom of `index.js`) while still working as a normal
+`node index.js` server locally.
 
 1. Push this folder to its own GitHub repository (do **not** commit `.env`
    — it's already in `.gitignore`).
-2. Go to [render.com](https://render.com) and sign up / log in (GitHub
-   login is fine, no card needed for the free tier).
-3. **New** → **Web Service** → connect the GitHub repo you just pushed.
-4. Settings:
-   - **Runtime**: Node
-   - **Build command**: `npm install`
-   - **Start command**: `npm start`
-   - **Instance type**: Free
-5. Under **Environment**, add the same three variables from your local
-   `.env`: `FIREBASE_SERVICE_ACCOUNT`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`,
-   `OTP_HASH_PEPPER`. Do not set `PORT` — Render provides it automatically.
-6. Deploy. Render will give you a URL like `https://shoppy-otp-backend.onrender.com`.
-7. Give that URL to Claude so it can be wired into the Flutter app as the
-   backend base URL.
+2. Go to [vercel.com](https://vercel.com) and sign up / log in with
+   GitHub (no card needed for the Hobby tier). Note: Hobby is officially
+   licensed for personal/non-commercial projects — acceptable here as a
+   small-scale OTP backend, but worth knowing.
+3. **Add New...** → **Project** → import the GitHub repo you just pushed.
+   Leave the framework preset as **Other**.
+4. Under **Environment Variables**, add:
+   - `FIREBASE_SERVICE_ACCOUNT_BASE64` — **base64-encode the service
+     account JSON first**, don't paste the raw JSON. Several hosting
+     UIs (confirmed on Vercel) mangle the `private_key` field's escaped
+     `\n` newlines on paste, breaking the PEM and crashing the Admin SDK
+     with `Invalid PEM formatted message`. Generate it with:
+     ```bash
+     node -e "console.log(Buffer.from(require('fs').readFileSync('service-account.json')).toString('base64'))"
+     ```
+     (or, from an already-set local `.env`:
+     `node -e "require('dotenv').config(); console.log(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT).toString('base64'))"`)
+   - `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `OTP_HASH_PEPPER` — same values
+     as your local `.env`.
+   - Don't set `PORT` — not used on Vercel (serverless, no listening port).
+5. Click **Deploy**.
+6. Use the **production domain** Vercel gives you
+   (`https://<project-name>.vercel.app`, no random hash in it) as the
+   app's backend URL — the per-deployment preview URL (with a hash like
+   `shoppy-otp-backend-9rzhtb6tc-....vercel.app`) is protected by
+   Vercel's SSO wall and will redirect every request to a login page,
+   making it unusable as a public API endpoint.
+7. Give that production URL to Claude so it can be wired into the
+   Flutter app as the backend base URL.
 
-Note: Render's free tier spins the service down after inactivity, so the
-first request after a quiet period may take 30-60 seconds (cold start) —
-expected, not a bug.
+Note: Vercel serverless functions are stateless between cold starts, so
+`express-rate-limit`'s in-memory store won't reliably persist across
+invocations the way it would on a traditional always-on server — a known,
+acceptable trade-off for a "basic" backend at this scale, not a bug.
 
 ## 3. Firestore rules
 
