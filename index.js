@@ -160,5 +160,14 @@ app.post('/otp/password-reset/verify', async (req, res) => {
 
 app.get('/', (req, res) => res.json({ ok: true, service: 'shoppy-otp-backend' }));
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`shoppy-otp-backend listening on ${port}`));
+// `node index.js` (local dev / any traditional host) starts a normal
+// listening server. On Vercel, this file is required as a module by
+// their Node runtime rather than run directly, so require.main !==
+// module there -- it skips straight to exporting the Express app, which
+// @vercel/node treats as a (req, res) request handler.
+if (require.main === module) {
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => console.log(`shoppy-otp-backend listening on ${port}`));
+}
+
+module.exports = app;
